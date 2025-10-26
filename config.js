@@ -3,6 +3,8 @@ module.exports = {
   colors: ['white', 'black', 'brown'],
   chairsVariants: ['gray', 'white'],
   
+  lengths: ['2.5', '3', '3.5', '4', '4.5'],
+  
   photos: {
     // Локальные пути
     low_white: './images/low_white.png',
@@ -28,9 +30,11 @@ module.exports = {
   },
   
   prices: {
-    low: { '2.5': 2000, '3': 2000, '3.5': 2000, '4': 2000 },
-    high: { '2.5': 3000, '3': 3000, '3.5': 3000, '4': 3000 },
-    colorAddon: { white: 0, black: 0, brown: 0 },
-    chair: { gray: 500, white: 200 }
-  }
+      low: { '2.5': 2000, '3': 2000, '3.5': 2000, '4': 2000, '4.5': 2500 }, // NEW: per day, added 4.5
+      high: { '2.5': 3000, '3': 3000, '3.5': 3000, '4': 3000, '4.5': 3500 },
+      colorAddon: { white: 0, black: 0, brown: 0 },
+      chair: { gray: 500, white: 200 }
+    },
+  
+  maxChairsPerLength: { '2.5': 8, '3': 10, '3.5': 12, '4': 14, '4.5': 16 }
 };

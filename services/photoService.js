@@ -9,12 +9,10 @@ class PhotoService {
   async getPhotoSource(key) {
     const localPath = config.photos[key];
     
-    // Проверяем наличие локального файла
     try {
       await fs.access(localPath);
       return { source: localPath, isLocal: true };
     } catch {
-      // Используем fallback URL
       const fallbackUrl = config.photos.fallback[key];
       if (fallbackUrl) {
         return { url: fallbackUrl, isLocal: false };
@@ -23,9 +21,6 @@ class PhotoService {
     }
   }
 
-  /**
-   * Отправить фото с обработкой ошибок
-   */
   async sendPhoto(ctx, key, caption, replyMarkup) {
     const photo = await this.getPhotoSource(key);
     

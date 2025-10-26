@@ -147,12 +147,17 @@ bot.on('callback_query', async (ctx) => {
   }
 });
 
-// Обработка текстовых сообщений
 bot.on('text', async (ctx) => {
   const lang = ctx.session.lang;
   try {
     if (!ctx.session || !ctx.session.step) {
       await ctx.reply(translations[lang].useStart);
+      return;
+    }
+
+    // NEW: Handle guests count
+    if (ctx.session.step === 'guests_count') {
+      await orderService.handleGuestsCount(ctx, ctx.message.text);
       return;
     }
 
@@ -162,23 +167,35 @@ bot.on('text', async (ctx) => {
     }
 
     if (ctx.session.step === 'name') {
-      ctx.session.name = ctx.message.text;
+      ctx.session.name = ctx.message.text.trim();
+      if (!ctx.session.name) {
+        await ctx.reply(translations[lang].invalidInput);
+        return;
+      }
       ctx.session.step = 'phone';
       await ctx.reply(translations[lang].enterPhone, { parse_mode: 'Markdown' });
-    } 
-    else if (ctx.session.step === 'phone') {
-      ctx.session.phone = ctx.message.text;
+    } else if (ctx.session.step === 'phone') {
+      ctx.session.phone = ctx.message.text.trim();
+      if (!/^\+?\d{10,15}$/.test(ctx.session.phone)) { // Basic validation
+        await ctx.reply(translations[lang].invalidPhone);
+        return;
+      }
       ctx.session.step = 'address';
       await ctx.reply(translations[lang].enterAddress, { parse_mode: 'Markdown' });
-    } 
-    else if (ctx.session.step === 'address') {
-      ctx.session.address = ctx.message.text;
-      ctx.session.step = 'dateTime';
-      await ctx.reply(translations[lang].enterDateTime, { parse_mode: 'Markdown' });
-    } 
-    else if (ctx.session.step === 'dateTime') {
-      ctx.session.dateTime = ctx.message.text;
-      await orderService.showOrderSummary(ctx);
+    } else if (ctx.session.step === 'address') {
+      ctx.session.address = ctx.message.text.trim();
+      if (!ctx.session.address) {
+        await ctx.reply(translations[lang].invalidInput);
+        return;
+      }
+      ctx.session.step = 'days_count'; // NEW: ask days
+      await ctx.reply(translations[lang].enterDaysCount, { parse_mode: 'Markdown' });
+    } else if (ctx.session.step === 'days_count') { // NEW
+      await orderService.handleDaysCount(ctx, ctx.message.text);
+      return;
+    } else if (ctx.session.step === 'start_date') { // NEW
+      await orderService.handleStartDate(ctx, ctx.message.text);
+      return;
     }
   } catch (error) {
     console.error('Ошибка обработки текста:', error);

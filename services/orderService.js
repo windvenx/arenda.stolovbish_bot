@@ -3,18 +3,66 @@ const config = require('../config');
 const translations = require('../translations');
 const photoService = require('./photoService');
 const messageService = require('./messageService');
+const moment = require('moment');
 
 class OrderService {
-  /**
-   * Get recommended maximum chairs based on table length
-   */
   getRecommendedChairs(length) {
     const len = parseFloat(length);
     if (len === 2.5) return 8;
     if (len === 3) return 10;
     if (len === 3.5) return 12;
     if (len === 4) return 14;
+    if (len === 4.5) return 16;
     return 10; // fallback
+  }
+
+  /**
+   * NEW: Get recommended length based on places per table
+   */
+  getRecommendedLength(places) {
+    if (places <= 8) return '2.5';
+    if (places <= 10) return '3';
+    if (places <= 12) return '3.5';
+    if (places <= 14) return '4';
+    return '4.5';
+  }
+
+  /**
+   * NEW: Ask guests count
+   */
+  async askGuestsCount(ctx) {
+    const lang = ctx.session.lang;
+    const t = translations[lang];
+    await ctx.reply(t.enterGuestsCount, {
+      parse_mode: 'Markdown',
+      reply_markup: {
+        inline_keyboard: [[{ text: t.mainMenu, callback_data: 'main_menu' }]]
+      }
+    });
+  }
+
+  /**
+   * NEW: Handle guests count (text)
+   */
+  async handleGuestsCount(ctx, text) {
+    const lang = ctx.session.lang;
+    const t = translations[lang];
+    const guests = parseInt(text.trim());
+    if (isNaN(guests) || guests < 1 || guests > 50) { // Arbitrary max
+      await ctx.reply(t.invalidGuests);
+      return;
+    }
+    ctx.session.guests = guests;
+
+    // Calculate recommendations
+    const maxPerTable = config.maxChairsPerLength['4.5']; // 16
+    ctx.session.tables_count = Math.ceil(guests / maxPerTable);
+    const recommendedLength = this.getRecommendedLength(guests / ctx.session.tables_count);
+
+    await ctx.reply(t.guestsConfirmed.replace('{guests}', guests).replace('{tables}', ctx.session.tables_count), { parse_mode: 'Markdown' });
+
+    ctx.session.step = 'type';
+    await this.askTableType(ctx);
   }
 
   /**
@@ -51,13 +99,9 @@ class OrderService {
       `${ctx.session.type}_white`,
       t.choseTypeText.replace('{type}', typeName),
       {
-        inline_keyboard: [
-          [{ text: t.size2_5, callback_data: 'length_2.5' }],
-          [{ text: t.size3, callback_data: 'length_3' }],
-          [{ text: t.size3_5, callback_data: 'length_3.5' }],
-          [{ text: t.size4, callback_data: 'length_4' }],
-          [{ text: t.back, callback_data: 'start_order' }]
-        ]
+        inline_keyboard: config.lengths.map(len => ([{ text: t[`size${len.replace('.', '_')}`], callback_data: `length_${len}` }])).concat(
+          [[{ text: t.back, callback_data: 'start_order' }]]
+        )
       }
     );
   }
@@ -166,6 +210,38 @@ class OrderService {
     await ctx.reply(t.choseChairVariant.replace('{variant}', variantName), { parse_mode: 'Markdown' });
     ctx.session.step = 'name';
     await ctx.reply(t.enterName, { parse_mode: 'Markdown' });
+  }
+
+  /**
+   * NEW: Handle days count (text)
+   */
+  async handleDaysCount(ctx, text) {
+    const lang = ctx.session.lang;
+    const t = translations[lang];
+    const days = parseInt(text.trim());
+    if (isNaN(days) || days < 1) {
+      await ctx.reply(t.invalidDays);
+      return;
+    }
+    ctx.session.days = days;
+    ctx.session.step = 'start_date';
+    await ctx.reply(t.enterStartDate, { parse_mode: 'Markdown' });
+  }
+
+  /**
+   * NEW: Handle start date (text)
+   */
+  async handleStartDate(ctx, text) {
+    const lang = ctx.session.lang;
+    const t = translations[lang];
+    const date = moment(text, 'DD.MM.YYYY', true);
+    if (!date.isValid()) {
+      await ctx.reply(t.invalidDate);
+      return;
+    }
+    ctx.session.start_date = date.format('DD.MM.YYYY');
+    ctx.session.end_date = date.clone().add(ctx.session.days - 1, 'days').format('DD.MM.YYYY'); // Calculate end
+    await this.showOrderSummary(ctx);
   }
 
   /**

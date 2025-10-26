@@ -1,9 +1,7 @@
 const translations = require('../translations');
 
 class MenuService {
-  /**
-   * Get main menu markup
-   */
+  
   getMainMenuMarkup(lang) {
     const t = translations[lang];
     return {

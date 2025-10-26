@@ -3,9 +3,6 @@ const config = require('../config');
 const translations = require('../translations');
 
 class MessageService {
-  /**
-   * Get table type name
-   */
   getTableTypeName(lang, type) {
     return translations[lang].tableTypeNames[type];
   }
@@ -37,6 +34,15 @@ class MessageService {
     const typeText = this.getTableTypeName(lang, session.type);
     const colorText = this.getColorName(lang, session.color);
     
+    // FIX: Установить tables_count по умолчанию, если не задан
+    const tablesCount = session.tables_count || 1;
+    const days = session.days || 1;
+    
+    // NEW: Add guests and tables
+    const tablesText = tablesCount > 1 
+      ? t.tablesCombo.replace('{count}', tablesCount).replace('{length}', session.length) 
+      : session.length + 'м';
+    
     // Calculate price
     const basePrice = config.prices[session.type][session.length];
     const colorAddon = config.prices.colorAddon[session.color] || 0;
@@ -55,23 +61,37 @@ class MessageService {
     }
     
     const deliveryPrice = 0; // Free according to price list
-    const total = basePrice + colorAddon + chairsPrice + deliveryPrice;
     
-    return `${t.orderDetails}` +
+    // FIX: Правильный расчет total
+    const tableTotalPrice = (basePrice + colorAddon) * tablesCount * days;
+    const chairsTotalPrice = chairsPrice * days;
+    const total = tableTotalPrice + chairsTotalPrice + deliveryPrice;
+    
+    // FIX: Формируем сводку с проверкой на guests
+    let summary = `${t.orderDetails}`;
+    
+    if (session.guests) {
+      summary += `${t.guestsLabel}${session.guests}\n`;
+    }
+    
+    summary += `${t.tablesLabel}${tablesText}\n` +
       `${t.typeLabel}${typeText}\n` +
-      t.sizeLabel.replace('{length}', session.length) +
       `${t.colorLabel}${colorText}\n` +
       `${t.chairsLabel}${chairsText}\n\n` +
+      `${t.daysLabel}${days}\n` +
+      `${t.startDateLabel}${session.start_date}\n` +
+      `${t.endDateLabel}${session.end_date}\n\n` +
       `${t.nameLabel}${session.name}\n` +
       `${t.phoneLabel}${session.phone}\n` +
-      `${t.addressLabel}${session.address}\n` +
-      `${t.dateTimeLabel}${session.dateTime}\n\n` +
+      `${t.addressLabel}${session.address}\n\n` +
       `${t.cost}` +
-      t.tableRent.replace('{price}', basePrice) +
-      (colorAddon > 0 ? t.colorAddon.replace('{color}', colorText).replace('{addon}', colorAddon) : '') +
-      (chairsPrice > 0 ? t.chairsCost.replace('{price}', chairsPrice) : '') +
+      t.tableRent.replace('{price}', tableTotalPrice) +
+      (colorAddon > 0 ? t.colorAddon.replace('{color}', colorText).replace('{addon}', colorAddon * tablesCount * days) : '') +
+      (chairsPrice > 0 ? t.chairsCost.replace('{price}', chairsTotalPrice) : '') +
       t.delivery.replace('{price}', deliveryPrice) +
       t.total.replace('{total}', total);
+    
+    return summary;
   }
 }
 
