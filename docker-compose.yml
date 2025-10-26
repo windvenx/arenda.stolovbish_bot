@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  bot:
+    build: .  
+    container_name: arenda-bot
+    restart: always
+    healthcheck:
+      test: ["CMD", "node", "-e", "process.exit(0)"]  # Простая проверка, что Node жив
+      interval: 30s
+      retries: 3
+    env_file: .env 
+    volumes:
+      - ./session.json:/app/session.json
+      - ./images:/app/images 
